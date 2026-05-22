@@ -1,0 +1,32 @@
+{
+  "E233-1000（京滨东北・根岸线）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E235-0（山手线）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E217（总武快速线 成田线）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E257-5500&E257-2000（东海道货物线）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 7,
+    "has_hb": true
+  },
+  "Kiha 54-500（留萌本线）": {
+    "control_type": "2-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  }
+}
