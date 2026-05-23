@@ -587,6 +587,7 @@ class App:
         )
         self.clock   = pygame.time.Clock()
         self._configure_key_queue_profile()
+        self._apply_vehicle_defaults()
 
         # 控制状态
         self.current_notch:  int | None = None
@@ -718,7 +719,7 @@ class App:
 
     def _185_brake_names(self):
         names = [f"B{i}" for i in range(self.vcfg["brake_notches"], 0, -1)]
-        names.append("Running")
+        names.append("运行")
         return names
 
     def _185_brake_force(self, notch_index: int) -> int:
@@ -747,6 +748,13 @@ class App:
         else:
             self.queue.default_hold_ms = 0
             self.queue.vk_hold_ms = {}
+
+    def _apply_vehicle_defaults(self):
+        if self.is_185_real:
+            self.cfg["axis_dual_average"] = False
+        else:
+            self.cfg["axis_dual_average"] = True
+        save_config(self.cfg)
 
     # ── 归位同步 ────────────────────────────────────────────────────────
     def trigger_resync(self):
@@ -1268,6 +1276,7 @@ class App:
             self.js = self._init_joystick()
         else:
             self.cfg["selected_vehicle"] = self.veh_names[self.overlay.cursor]
+            self._apply_vehicle_defaults()
             save_config(self.cfg)
             self._configure_key_queue_profile()
             # 切换车辆后重置同步状态
@@ -1381,16 +1390,16 @@ class App:
             desc  = notch_description(name)
             if self.is_185_real and self.current_brake_notch is not None:
                 brake_name = self._185_brake_names()[self.current_brake_notch]
-                brake_color = COLOR_GRAY if brake_name == "Running" else COLOR_ORANGE
-                brake_desc = "Running" if brake_name == "Running" else "Service Brake"
+                brake_color = COLOR_GRAY if brake_name == "运行" else COLOR_ORANGE
+                brake_desc = "运行" if brake_name == "运行" else "常用制动"
                 power_name = name
                 power_color = color
-                power_desc = "Neutral" if name == "N" else desc
+                power_desc = "空档" if name == "N" else desc
 
-                draw_text(surf, self.fonts["sm"], "Brake", COLOR_DIM, text_x, text_y)
+                draw_text(surf, self.fonts["sm"], "制动", COLOR_DIM, text_x, text_y)
                 draw_text(surf, self.fonts["lg"], brake_name, brake_color, text_x, text_y + 18)
                 draw_text(surf, self.fonts["md"], brake_desc, brake_color, text_x, text_y + 62)
-                draw_text(surf, self.fonts["sm"], "Power / Hold", COLOR_DIM, text_x, text_y + 106)
+                draw_text(surf, self.fonts["sm"], "动力 / 抑速", COLOR_DIM, text_x, text_y + 106)
                 draw_text(surf, self.fonts["lg"], power_name, power_color, text_x, text_y + 124)
                 draw_text(surf, self.fonts["md"], power_desc, power_color, text_x, text_y + 168)
                 draw_text(surf, self.fonts["sm"],

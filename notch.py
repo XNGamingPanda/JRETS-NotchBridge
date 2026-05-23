@@ -42,7 +42,7 @@ def get_total_notches(cfg):
 def notch_description(name):
     if name.startswith("H"):
         n = name[1:]
-        return f"Hold Brake {n}"
+        return f"抑速 {n} 档"
     if name == "N":
         return "空档"
     if name == "HB":
