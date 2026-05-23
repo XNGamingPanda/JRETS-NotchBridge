@@ -22,6 +22,8 @@ def build_notch_names(power, brake, has_hb):
 def notch_color(name):
     if name.startswith("B"):
         return COLOR_ORANGE
+    if name.startswith("H"):
+        return COLOR_BLUE
     if name == "HB":
         return COLOR_ORANGE
     if name == "N":
@@ -38,6 +40,9 @@ def get_total_notches(cfg):
 
 
 def notch_description(name):
+    if name.startswith("H"):
+        n = name[1:]
+        return f"Hold Brake {n}"
     if name == "N":
         return "空档"
     if name == "HB":

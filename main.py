@@ -645,6 +645,14 @@ class App:
     @property
     def notch_names(self):
         v = self.vcfg
+        if self.is_185_real:
+            names = []
+            for i in range(v["brake_notches"], 0, -1):
+                names.append(f"B{i}")
+            names.append("N")
+            for i in range(1, v["power_notches"] + 1):
+                names.append(f"H{i}")
+            return names
         return build_notch_names(v["power_notches"], v["brake_notches"], v["has_hb"])
 
     @property
@@ -701,9 +709,10 @@ class App:
         if self.is_185_real:
             self.queue.default_hold_ms = 0
             self.queue.vk_hold_ms = {
-                VK_K: 50,
-                VK_L: 50,
+                VK_Q: 50,
+                VK_Z: 50,
                 VK_M: 50,
+                VK_COMMA: 50,
                 VK_DOT: 50,
                 VK_SLASH: 50,
             }
@@ -715,7 +724,7 @@ class App:
     def trigger_resync(self):
         self.queue.clear()
         if self.is_185_real:
-            self.queue.push([VK_M, VK_S] + [VK_L] * self._185_direct_air_levels() + [VK_DOT])
+            self.queue.push([VK_M, VK_S] + [VK_DOT] * (self.vcfg["brake_notches"] + 2))
         elif self.control_type == "2-handle":
             self.queue.push([VK_S] + [VK_DOT] * (self.vcfg["brake_notches"] + 2))
         else:
@@ -746,36 +755,24 @@ class App:
     def _build_transition_keys(self, current: int, target: int) -> list[int]:
         if self.is_185_real:
             n = self.n_index
-            direct_levels = self._185_direct_air_levels()
             if current == target:
                 return []
             if current > n and target > n:
                 diff = target - current
-                return [VK_Z] * diff if diff > 0 else [VK_A] * abs(diff)
+                return [VK_Q] * diff if diff > 0 else [VK_Z] * abs(diff)
             if current == n:
                 if target < n:
-                    brake_force = n - target
-                    if brake_force <= direct_levels:
-                        return [VK_L] * brake_force
-                    return [VK_L] * direct_levels + [VK_DOT]
-                return [VK_Z] * (target - n)
+                    return [VK_DOT] * (n - target)
+                return [VK_Q] * (target - n)
             if target == n:
                 return [VK_M] if current < n else [VK_S]
             if current < n and target < n:
-                current_force = self._185_brake_force(current)
-                target_force = self._185_brake_force(target)
-                if current_force <= direct_levels and target_force <= direct_levels:
-                    diff = target_force - current_force
-                    return [VK_L] * diff if diff > 0 else [VK_K] * abs(diff)
-                if current_force <= direct_levels and target_force > direct_levels:
-                    return [VK_L] * max(0, direct_levels - current_force) + [VK_DOT]
-                if current_force > direct_levels and target_force <= direct_levels:
-                    return [VK_M] + [VK_L] * target_force
-                return []
+                diff = target - current
+                return [VK_COMMA] * diff if diff > 0 else [VK_DOT] * abs(diff)
             if current < n and target > n:
-                return [VK_M] + [VK_Z] * (target - n)
+                return [VK_M, VK_S] + [VK_Q] * (target - n)
             if current > n and target < n:
-                return [VK_S] + self._build_transition_keys(n, target)
+                return [VK_S, VK_M] + [VK_DOT] * (n - target)
 
         if self.control_type != "2-handle":
             diff = target - current
@@ -991,22 +988,18 @@ class App:
             vk = self.queue.last_sent_vk
             total = self.total_notches
             if self.is_185_real:
-                if vk == VK_Z:
+                if vk == VK_Q and self.current_notch >= self.n_index:
                     self.current_notch = min(total - 1, self.current_notch + 1)
-                elif vk == VK_A and self.current_notch > self.n_index:
+                elif vk == VK_Z and self.current_notch > self.n_index:
                     self.current_notch = max(self.n_index, self.current_notch - 1)
                 elif vk == VK_S:
                     self.current_notch = self.n_index
                 elif vk == VK_M:
                     self.current_notch = self.n_index
-                elif vk == VK_L:
-                    brake_force = min(self._185_direct_air_levels(), self._185_brake_force(self.current_notch) + 1)
-                    self.current_notch = self._185_notch_from_force(brake_force)
-                elif vk == VK_K:
-                    brake_force = max(0, self._185_brake_force(self.current_notch) - 1)
-                    self.current_notch = self._185_notch_from_force(brake_force)
                 elif vk == VK_DOT:
-                    self.current_notch = 0
+                    self.current_notch = max(0, self.current_notch - 1)
+                elif vk == VK_COMMA and self.current_notch < self.n_index:
+                    self.current_notch = min(self.n_index, self.current_notch + 1)
             elif vk == VK_Z:
                 self.current_notch = min(total - 1, self.current_notch + 1)
             elif vk == VK_Q:
