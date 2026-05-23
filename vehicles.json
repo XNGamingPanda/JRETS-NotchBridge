@@ -44,11 +44,17 @@
   "E211（大糸线）": {
     "control_type": "2-handle",
     "power_notches": 5,
-    "brake_notches": 8,
+    "brake_notches": 7,
     "has_hb": false
   },
   "Kiha E130-500系（八户线）": {
     "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "185-0系（东海道线）": {
+    "control_type": "2-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
