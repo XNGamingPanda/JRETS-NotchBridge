@@ -168,6 +168,8 @@ class KeyQueue:
         self.pending: list[int] = []
         self.last_send_time: float = 0.0
         self.last_sent_vk: int | None = None
+        self.default_hold_ms: int = 0
+        self.vk_hold_ms: dict[int, int] = {}
 
     def push(self, vk_list: list[int]) -> None:
         self.pending.extend(vk_list)
@@ -183,7 +185,8 @@ class KeyQueue:
         now = time.monotonic()
         if self.pending and (now - self.last_send_time) * 1000 >= interval_ms:
             vk = self.pending.pop(0)
-            send_key_raw(vk)
+            hold_ms = self.vk_hold_ms.get(vk, self.default_hold_ms)
+            send_key_raw(vk, hold_ms=hold_ms)
             self.last_sent_vk = vk
             self.last_send_time = now
             return True

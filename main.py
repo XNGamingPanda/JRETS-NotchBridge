@@ -586,6 +586,7 @@ class App:
             self.cfg["game_window_title"],
         )
         self.clock   = pygame.time.Clock()
+        self._configure_key_queue_profile()
 
         # 控制状态
         self.current_notch:  int | None = None
@@ -695,6 +696,20 @@ class App:
         if brake_force <= 0:
             return self.n_index
         return max(0, self.n_index - brake_force)
+
+    def _configure_key_queue_profile(self):
+        if self.is_185_real:
+            self.queue.default_hold_ms = 0
+            self.queue.vk_hold_ms = {
+                VK_K: 50,
+                VK_L: 50,
+                VK_M: 50,
+                VK_DOT: 50,
+                VK_SLASH: 50,
+            }
+        else:
+            self.queue.default_hold_ms = 0
+            self.queue.vk_hold_ms = {}
 
     # ── 归位同步 ────────────────────────────────────────────────────────
     def trigger_resync(self):
@@ -1197,6 +1212,7 @@ class App:
         else:
             self.cfg["selected_vehicle"] = self.veh_names[self.overlay.cursor]
             save_config(self.cfg)
+            self._configure_key_queue_profile()
             # 切换车辆后重置同步状态
             self.current_notch = None
             self.syncing = False
