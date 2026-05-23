@@ -1,59 +1,59 @@
 {
-  "E233-1000（京滨东北・根岸线）": {
+  "E233-1000系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "E235-0（山手线）": {
+  "E235-0系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "E217（总武快速线 成田线）": {
+  "E217系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "E257-5500&E257-2000（东海道货物线）": {
+  "E257-5500系/E257-2000系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 7,
     "has_hb": true
   },
-  "Kiha 54-500（留萌本线）": {
+  "Kiha 54-500系": {
     "control_type": "2-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "E233-3000（东海道线）": {
+  "E233-3000系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "E233（中央线快速）": {
+  "E233系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "E211（大糸线）": {
+  "E211系": {
     "control_type": "2-handle",
     "power_notches": 5,
     "brake_notches": 7,
     "has_hb": true
   },
-  "Kiha E130-500系（八户线）": {
+  "Kiha E130-500系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
   },
-  "185-0系（东海道线）": {
+  "185系": {
     "control_type": "185-real",
     "hold_notches": 5,
     "power_notches": 5,

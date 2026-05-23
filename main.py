@@ -75,8 +75,39 @@ LEGACY_CONFIG_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 LEGACY_VEHICLES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vehicles.json")
 DEFAULT_VEHICLES_PATH = os.path.join(RESOURCE_BASE, "vehicles.json")
 
+ROUTE_OPTIONS = {
+    "京滨东北・根岸线": ["E233-1000系"],
+    "山手线": ["E235-0系"],
+    "总武快速线・成田线": ["E217系"],
+    "东海道货物线": ["E257-5500系/E257-2000系"],
+    "留萌本线": ["Kiha 54-500系"],
+    "东海道线": ["E233-3000系", "185系"],
+    "湘南新宿线": ["E233-3000系", "185系"],
+    "中央线快速": ["E233系"],
+    "大糸线": ["E211系"],
+    "八户线": ["Kiha E130-500系"],
+}
+
+VEHICLE_ALIASES = {
+    "E233-1000（京滨东北・根岸线）": "E233-1000系",
+    "E235-0（山手线）": "E235-0系",
+    "E217（总武快速线 成田线）": "E217系",
+    "E257-5500&E257-2000（东海道货物线）": "E257-5500系/E257-2000系",
+    "Kiha 54-500（留萌本线）": "Kiha 54-500系",
+    "E233-3000（东海道线）": "E233-3000系",
+    "E233-3000（湘南新宿线）": "E233-3000系",
+    "E233（中央线快速）": "E233系",
+    "E211（大糸线）": "E211系",
+    "Kiha E130-500系（八户线）": "Kiha E130-500系",
+    "185-0系（东海道线）": "185系",
+    "185-200系（湘南新宿线）": "185系",
+    "185-0系": "185系",
+    "185-200系": "185系",
+}
+
 DEFAULT_CONFIG = {
-    "selected_vehicle": "E233-1000\uff08\u4eac\u6ee8\u4e1c\u5317\u30fb\u6839\u5cb8\u7ebf\uff09",
+    "selected_route": "京滨东北・根岸线",
+    "selected_vehicle": "E233-1000系",
     "joystick_index": 0,
     "axis_index": 0,
     "axis_invert": False,
@@ -117,12 +148,36 @@ def ensure_appdata_files():
         shutil.copy2(LEGACY_CONFIG_PATH, CONFIG_PATH)
 
 
+def normalize_vehicles(data):
+    normalized = {}
+    for key, value in data.items():
+        canonical = VEHICLE_ALIASES.get(key, key)
+        normalized[canonical] = value
+
+    for route_vehicles in ROUTE_OPTIONS.values():
+        for vehicle in route_vehicles:
+            if vehicle not in normalized:
+                raise KeyError(f"Missing vehicle config: {vehicle}")
+    return normalized
+
+
+def route_for_vehicle(vehicle_name: str):
+    for route, vehicles in ROUTE_OPTIONS.items():
+        if vehicle_name in vehicles:
+            return route
+    return next(iter(ROUTE_OPTIONS))
+
+
 def load_config():
     ensure_appdata_files()
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         cfg = {**DEFAULT_CONFIG, **data}
+        cfg["selected_vehicle"] = VEHICLE_ALIASES.get(cfg.get("selected_vehicle", ""), cfg.get("selected_vehicle", DEFAULT_CONFIG["selected_vehicle"]))
+        cfg["selected_route"] = cfg.get("selected_route") or route_for_vehicle(cfg["selected_vehicle"])
+        if cfg["selected_vehicle"] not in ROUTE_OPTIONS.get(cfg["selected_route"], []):
+            cfg["selected_route"] = route_for_vehicle(cfg["selected_vehicle"])
         cfg.setdefault("button_horn", -1)
         cfg.setdefault("button_skip_stop", -1)
         cfg.setdefault("button_stop_announce", -1)
@@ -136,7 +191,8 @@ def load_config():
         return cfg
     cfg = dict(DEFAULT_CONFIG)
     cfg.update({
-        "selected_vehicle": "E233-1000（京滨东北・根岸线）",
+        "selected_route": "京滨东北・根岸线",
+        "selected_vehicle": "E233-1000系",
         "button_horn": -1,
         "button_skip_stop": -1,
         "button_stop_announce": -1,
@@ -154,7 +210,7 @@ def save_config(cfg):
 def load_vehicles():
     ensure_appdata_files()
     with open(VEHICLES_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return normalize_vehicles(json.load(f))
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -569,6 +625,7 @@ class App:
         self.cfg      = load_config()
         self.vehicles = load_vehicles()
         self.veh_names = list(self.vehicles.keys())
+        self.route_names = list(ROUTE_OPTIONS.keys())
 
         self.screen = pygame.display.set_mode((WIN_W, WIN_H))
         pygame.display.set_caption("JRETS Controller")
@@ -606,6 +663,8 @@ class App:
         self.overlay: SelectOverlay | None = None
         self.button_learn_target: str | None = None  # "neutral" / "eb" / "resync"
         self.interval_editing: bool = False
+        self.settings_open: bool = False
+        self.pending_route: str | None = None
 
         # 鼠标悬停追踪
         self.hover_rect_id: str = ""
@@ -643,6 +702,10 @@ class App:
     def vcfg(self):
         name = self.cfg["selected_vehicle"]
         return self.vehicles.get(name, list(self.vehicles.values())[0])
+
+    @property
+    def current_route(self):
+        return self.cfg.get("selected_route", route_for_vehicle(self.cfg["selected_vehicle"]))
 
     @property
     def notch_names(self):
@@ -868,6 +931,7 @@ class App:
                         if result == "confirm":
                             self._overlay_confirm()
                         elif result == "cancel":
+                            self.pending_route = None
                             self.overlay = None
                     elif self.button_learn_target:
                         if event.key == pygame.K_ESCAPE:
@@ -1180,13 +1244,28 @@ class App:
                 self._on_click(cid)
                 return
 
+    def _open_route_overlay(self):
+        self.overlay = SelectOverlay("选择线路", self.route_names)
+        current_route = self.current_route
+        self.overlay.cursor = self.route_names.index(current_route) if current_route in self.route_names else 0
+        self.overlay._mode = "route"
+
+    def _open_vehicle_overlay(self, route_name: str):
+        vehicles = ROUTE_OPTIONS.get(route_name, [])
+        self.overlay = SelectOverlay("选择车型", vehicles)
+        current_vehicle = self.cfg["selected_vehicle"]
+        self.overlay.cursor = vehicles.index(current_vehicle) if current_vehicle in vehicles else 0
+        self.overlay._mode = "vehicle"
+        self.pending_route = route_name
+
     def _on_click(self, cid: str):
         cfg = self.cfg
-        vnames = self.veh_names
 
         if cid == "btn_vehicle":
-            self.overlay = SelectOverlay("选择车辆", vnames)
-            self.overlay.cursor = vnames.index(cfg["selected_vehicle"]) if cfg["selected_vehicle"] in vnames else 0
+            self._open_route_overlay()
+
+        elif cid == "btn_settings":
+            self.settings_open = not self.settings_open
 
         elif cid == "btn_device":
             devices = [f"[{i}] {pygame.joystick.Joystick(i).get_name()}"
@@ -1274,14 +1353,23 @@ class App:
             self.cfg["joystick_index"] = idx
             save_config(self.cfg)
             self.js = self._init_joystick()
+        elif mode == "route":
+            route_name = self.route_names[self.overlay.cursor]
+            self._open_vehicle_overlay(route_name)
+            return
         else:
-            self.cfg["selected_vehicle"] = self.veh_names[self.overlay.cursor]
+            route_name = self.pending_route or self.current_route
+            vehicle_name = ROUTE_OPTIONS.get(route_name, [self.cfg["selected_vehicle"]])[self.overlay.cursor]
+            self.cfg["selected_route"] = route_name
+            self.cfg["selected_vehicle"] = vehicle_name
             self._apply_vehicle_defaults()
-            save_config(self.cfg)
             self._configure_key_queue_profile()
             # 切换车辆后重置同步状态
             self.current_notch = None
+            self.current_brake_notch = None
             self.syncing = False
+            save_config(self.cfg)
+        self.pending_route = None
         self.overlay = None
 
     # ──────────────────────────────────────────────────────────────────
@@ -1328,16 +1416,18 @@ class App:
         pygame.draw.rect(surf, COLOR_PANEL, (0, 0, WIN_W, STATUS_H))
         fn, fm = self.fonts["sm"], self.fonts["md"]
 
-        vname = self.cfg["selected_vehicle"]
-        jsname = self.js.get_name() if self.js else "\u65e0\u8bbe\u5907"
+        route_name = self.current_route
+        vehicle_name = self.cfg["selected_vehicle"]
 
         right_x = WIN_W - 152
         left_w = right_x - 18
 
-        vehicle_full = f"\u8f66\u8f86: {vname}"
-        vehicle_shown = fit_text(fm, vehicle_full, left_w)
-        draw_text(surf, fm, vehicle_shown, COLOR_WHITE, 12, 8)
-        draw_text(surf, fn, fit_text(fn, f"\u8bbe\u5907: {jsname}", left_w), COLOR_GRAY, 12, 30)
+        route_full = f"线路: {route_name}"
+        vehicle_full = f"车型: {vehicle_name}"
+        route_shown = fit_text(fm, route_full, left_w)
+        vehicle_shown = fit_text(fn, vehicle_full, left_w)
+        draw_text(surf, fm, route_shown, COLOR_WHITE, 12, 8)
+        draw_text(surf, fn, vehicle_shown, COLOR_GRAY, 12, 31)
 
         foc_color = COLOR_GREEN if self.game_focused else COLOR_GRAY
         foc_text = "\u25cf \u5df2\u805a\u7126" if self.game_focused else "\u25cf \u672a\u805a\u7126"
@@ -1353,8 +1443,12 @@ class App:
         draw_text(surf, fn, "\u540c\u6b65:", COLOR_DIM, right_x, 30)
         draw_text(surf, fn, syn_text, syn_color, right_x + 38, 30)
 
-        if vehicle_shown != vehicle_full:
-            hover_rect = pygame.Rect(12, 8, min(left_w, fm.size(vehicle_shown)[0]), fm.get_height())
+        if route_shown != route_full:
+            hover_rect = pygame.Rect(12, 8, min(left_w, fm.size(route_shown)[0]), fm.get_height())
+            if hover_rect.collidepoint(mouse_pos):
+                draw_tooltip(surf, fn, route_full, mouse_pos[0] + 10, mouse_pos[1])
+        elif vehicle_shown != vehicle_full:
+            hover_rect = pygame.Rect(12, 31, min(left_w, fn.size(vehicle_shown)[0]), fn.get_height())
             if hover_rect.collidepoint(mouse_pos):
                 draw_tooltip(surf, fn, vehicle_full, mouse_pos[0] + 10, mouse_pos[1])
 
@@ -1403,7 +1497,7 @@ class App:
                 draw_text(surf, self.fonts["lg"], power_name, power_color, text_x, text_y + 124)
                 draw_text(surf, self.fonts["md"], power_desc, power_color, text_x, text_y + 168)
                 draw_text(surf, self.fonts["sm"],
-                          f"PH {cur} / {total - 1} | BR {self.current_brake_notch} / {self._185_brake_running_index}",
+                          f"动力位 {cur} / {total - 1} | 制动位 {self.current_brake_notch} / {self._185_brake_running_index}",
                           COLOR_GRAY, text_x, text_y + 206)
             else:
                 draw_text(surf, self.fonts["lg"], name,  color, text_x, text_y)
@@ -1532,14 +1626,25 @@ class App:
 
         for i, (cid, label) in enumerate([
             ("btn_vehicle", "选择车辆"),
-            ("btn_device", "选择设备"),
+            ("btn_settings", "设置"),
             ("btn_resync", "归位同步"),
         ]):
             r = pygame.Rect(start_x + i * (btn_w + gap), y, btn_w, btn_h)
             hov = r.collidepoint(mouse_pos)
-            act = (cid == "btn_resync" and self.syncing)
+            act = (cid == "btn_resync" and self.syncing) or (cid == "btn_settings" and self.settings_open)
             draw_button(surf, fn, label, r, hover=hov, active=act)
             self._clickables.append((cid, r))
+
+        y += btn_h + 8
+        if not self.settings_open:
+            return
+
+        device_name = self.js.get_name() if self.js else "无设备"
+        draw_text(surf, fn, fit_text(fn, f"设备: {device_name}", WIN_W - 150), COLOR_GRAY, 14, y + 5)
+        dev_r = pygame.Rect(WIN_W - 124, y, 110, btn_h)
+        hov = dev_r.collidepoint(mouse_pos)
+        draw_button(surf, fn, "选择设备", dev_r, hover=hov)
+        self._clickables.append(("btn_device", dev_r))
 
         y += btn_h + 8
 
