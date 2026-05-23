@@ -54,7 +54,7 @@
     "has_hb": false
   },
   "185-0系（东海道线）": {
-    "control_type": "2-handle",
+    "control_type": "185-real",
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false

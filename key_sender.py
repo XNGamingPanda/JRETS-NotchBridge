@@ -4,6 +4,8 @@ import time
 
 # Virtual key codes
 VK_Q = 0x51
+VK_K = 0x4B
+VK_L = 0x4C
 VK_Z = 0x5A
 VK_S = 0x53
 VK_A = 0x41

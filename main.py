@@ -20,7 +20,7 @@ from notch import (
 )
 from key_sender import (
     KeyQueue, send_key_raw, send_key_down, send_key_up,
-    VK_Q, VK_Z, VK_S, VK_A, VK_M, VK_1, VK_COMMA, VK_SLASH, VK_DOT,
+    VK_Q, VK_K, VK_L, VK_Z, VK_S, VK_A, VK_M, VK_1, VK_COMMA, VK_SLASH, VK_DOT,
     VK_RETURN, VK_BACK, VK_W, VK_PRIOR, VK_NEXT, VK_END,
 )
 from focus_checker import FocusChecker
@@ -655,6 +655,14 @@ class App:
         return get_total_notches(self.vcfg)
 
     @property
+    def is_two_handle(self):
+        return self.control_type in ("2-handle", "185-real")
+
+    @property
+    def is_185_real(self):
+        return self.control_type == "185-real"
+
+    @property
     def n_index(self):
         """N 档在档位列表中的内部索引。"""
         try:
@@ -675,10 +683,25 @@ class App:
             return primary
         return (primary + js.get_axis(axis2)) / 2.0
 
+    def _185_direct_air_levels(self):
+        return max(0, self.vcfg["brake_notches"] - 1)
+
+    def _185_brake_force(self, notch_index: int) -> int:
+        if notch_index >= self.n_index:
+            return 0
+        return self.n_index - notch_index
+
+    def _185_notch_from_force(self, brake_force: int) -> int:
+        if brake_force <= 0:
+            return self.n_index
+        return max(0, self.n_index - brake_force)
+
     # ── 归位同步 ────────────────────────────────────────────────────────
     def trigger_resync(self):
         self.queue.clear()
-        if self.control_type == "2-handle":
+        if self.is_185_real:
+            self.queue.push([VK_M, VK_S] + [VK_L] * self._185_direct_air_levels() + [VK_DOT])
+        elif self.control_type == "2-handle":
             self.queue.push([VK_S] + [VK_DOT] * (self.vcfg["brake_notches"] + 2))
         else:
             total = self.total_notches
@@ -689,14 +712,14 @@ class App:
 
     # ── EB 触发 ─────────────────────────────────────────────────────────
     def trigger_eb(self):
-        self.queue.push_urgent(VK_SLASH if self.control_type == "2-handle" else VK_1)
+        self.queue.push_urgent(VK_SLASH if self.is_two_handle else VK_1)
         self.eb_active = True
         # EB 后游戏档位已跳至紧急制动，当前追踪值失效，强制重新归位同步
         self.current_notch = None
 
     # ── N 档直跳 ────────────────────────────────────────────────────────
     def trigger_neutral(self):
-        if self.control_type == "2-handle":
+        if self.is_two_handle:
             self.queue.clear()
             self.queue.push([VK_M, VK_S])
         else:
@@ -706,6 +729,39 @@ class App:
         self.eb_active = False
 
     def _build_transition_keys(self, current: int, target: int) -> list[int]:
+        if self.is_185_real:
+            n = self.n_index
+            direct_levels = self._185_direct_air_levels()
+            if current == target:
+                return []
+            if current > n and target > n:
+                diff = target - current
+                return [VK_Z] * diff if diff > 0 else [VK_A] * abs(diff)
+            if current == n:
+                if target < n:
+                    brake_force = n - target
+                    if brake_force <= direct_levels:
+                        return [VK_L] * brake_force
+                    return [VK_L] * direct_levels + [VK_DOT]
+                return [VK_Z] * (target - n)
+            if target == n:
+                return [VK_M] if current < n else [VK_S]
+            if current < n and target < n:
+                current_force = self._185_brake_force(current)
+                target_force = self._185_brake_force(target)
+                if current_force <= direct_levels and target_force <= direct_levels:
+                    diff = target_force - current_force
+                    return [VK_L] * diff if diff > 0 else [VK_K] * abs(diff)
+                if current_force <= direct_levels and target_force > direct_levels:
+                    return [VK_L] * max(0, direct_levels - current_force) + [VK_DOT]
+                if current_force > direct_levels and target_force <= direct_levels:
+                    return [VK_M] + [VK_L] * target_force
+                return []
+            if current < n and target > n:
+                return [VK_M] + [VK_Z] * (target - n)
+            if current > n and target < n:
+                return [VK_S] + self._build_transition_keys(n, target)
+
         if self.control_type != "2-handle":
             diff = target - current
             return [VK_Z] * diff if diff > 0 else [VK_Q] * abs(diff)
@@ -919,7 +975,24 @@ class App:
         if sent and self.current_notch is not None:
             vk = self.queue.last_sent_vk
             total = self.total_notches
-            if vk == VK_Z:
+            if self.is_185_real:
+                if vk == VK_Z:
+                    self.current_notch = min(total - 1, self.current_notch + 1)
+                elif vk == VK_A and self.current_notch > self.n_index:
+                    self.current_notch = max(self.n_index, self.current_notch - 1)
+                elif vk == VK_S:
+                    self.current_notch = self.n_index
+                elif vk == VK_M:
+                    self.current_notch = self.n_index
+                elif vk == VK_L:
+                    brake_force = min(self._185_direct_air_levels(), self._185_brake_force(self.current_notch) + 1)
+                    self.current_notch = self._185_notch_from_force(brake_force)
+                elif vk == VK_K:
+                    brake_force = max(0, self._185_brake_force(self.current_notch) - 1)
+                    self.current_notch = self._185_notch_from_force(brake_force)
+                elif vk == VK_DOT:
+                    self.current_notch = 0
+            elif vk == VK_Z:
                 self.current_notch = min(total - 1, self.current_notch + 1)
             elif vk == VK_Q:
                 self.current_notch = max(0, self.current_notch - 1)
