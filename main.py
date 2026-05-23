@@ -590,6 +590,7 @@ class App:
 
         # 控制状态
         self.current_notch:  int | None = None
+        self.current_brake_notch: int | None = None
         self.eb_active:      bool = False
         self.axis_eb_in_zone:bool = False
         self.game_focused:   bool = True
@@ -647,11 +648,12 @@ class App:
         v = self.vcfg
         if self.is_185_real:
             names = []
-            for i in range(v["brake_notches"], 0, -1):
-                names.append(f"B{i}")
+            hold_notches = v.get("hold_notches", v["power_notches"])
+            for i in range(hold_notches, 0, -1):
+                names.append(f"H{i}")
             names.append("N")
             for i in range(1, v["power_notches"] + 1):
-                names.append(f"H{i}")
+                names.append(f"P{i}")
             return names
         return build_notch_names(v["power_notches"], v["brake_notches"], v["has_hb"])
 
@@ -661,6 +663,9 @@ class App:
 
     @property
     def total_notches(self):
+        if self.is_185_real:
+            hold_notches = self.vcfg.get("hold_notches", self.vcfg["power_notches"])
+            return hold_notches + 1 + self.vcfg["power_notches"]
         return get_total_notches(self.vcfg)
 
     @property
@@ -672,8 +677,16 @@ class App:
         return self.control_type == "185-real"
 
     @property
+    def is_synced(self):
+        if self.is_185_real:
+            return self.current_notch is not None and self.current_brake_notch is not None
+        return self.current_notch is not None
+
+    @property
     def n_index(self):
         """N 档在档位列表中的内部索引。"""
+        if self.is_185_real:
+            return self.vcfg.get("hold_notches", self.vcfg["power_notches"])
         try:
             return self.notch_names.index("N")
         except ValueError:
@@ -695,6 +708,19 @@ class App:
     def _185_direct_air_levels(self):
         return max(0, self.vcfg["brake_notches"] - 1)
 
+    @property
+    def _185_brake_total(self):
+        return self.vcfg["brake_notches"] + 1
+
+    @property
+    def _185_brake_running_index(self):
+        return self.vcfg["brake_notches"]
+
+    def _185_brake_names(self):
+        names = [f"B{i}" for i in range(self.vcfg["brake_notches"], 0, -1)]
+        names.append("Running")
+        return names
+
     def _185_brake_force(self, notch_index: int) -> int:
         if notch_index >= self.n_index:
             return 0
@@ -711,7 +737,9 @@ class App:
             self.queue.vk_hold_ms = {
                 VK_Q: 50,
                 VK_Z: 50,
+                VK_A: 50,
                 VK_M: 50,
+                VK_S: 50,
                 VK_COMMA: 50,
                 VK_DOT: 50,
                 VK_SLASH: 50,
@@ -724,13 +752,14 @@ class App:
     def trigger_resync(self):
         self.queue.clear()
         if self.is_185_real:
-            self.queue.push([VK_M, VK_S] + [VK_DOT] * (self.vcfg["brake_notches"] + 2))
+            self.queue.push([VK_M, VK_S])
         elif self.control_type == "2-handle":
             self.queue.push([VK_S] + [VK_DOT] * (self.vcfg["brake_notches"] + 2))
         else:
             total = self.total_notches
             self.queue.push([VK_Q] * (total + 2))
-        self.current_notch = 0
+        self.current_notch = self.n_index if self.is_185_real else 0
+        self.current_brake_notch = self._185_brake_running_index if self.is_185_real else None
         self.syncing       = True
         self.eb_active     = False
 
@@ -740,10 +769,13 @@ class App:
         self.eb_active = True
         # EB 后游戏档位已跳至紧急制动，当前追踪值失效，强制重新归位同步
         self.current_notch = None
+        self.current_brake_notch = None
 
     # ── N 档直跳 ────────────────────────────────────────────────────────
     def trigger_neutral(self):
-        if self.is_two_handle:
+        if self.is_185_real:
+            self.queue.push_urgent(VK_S)
+        elif self.is_two_handle:
             self.queue.clear()
             self.queue.push([VK_M, VK_S])
         else:
@@ -757,22 +789,22 @@ class App:
             n = self.n_index
             if current == target:
                 return []
-            if current > n and target > n:
-                diff = target - current
-                return [VK_Q] * diff if diff > 0 else [VK_Z] * abs(diff)
-            if current == n:
-                if target < n:
-                    return [VK_DOT] * (n - target)
-                return [VK_Q] * (target - n)
-            if target == n:
-                return [VK_M] if current < n else [VK_S]
             if current < n and target < n:
                 diff = target - current
-                return [VK_COMMA] * diff if diff > 0 else [VK_DOT] * abs(diff)
+                return [VK_A] * diff if diff > 0 else [VK_Q] * abs(diff)
+            if current > n and target > n:
+                diff = target - current
+                return [VK_Z] * diff if diff > 0 else [VK_A] * abs(diff)
+            if current == n:
+                if target < n:
+                    return [VK_Q] * (n - target)
+                return [VK_Z] * (target - n)
+            if target == n:
+                return [VK_A] * abs(target - current) if current != n else []
             if current < n and target > n:
-                return [VK_M, VK_S] + [VK_Q] * (target - n)
+                return [VK_S] + [VK_Z] * (target - n)
             if current > n and target < n:
-                return [VK_S, VK_M] + [VK_DOT] * (n - target)
+                return [VK_S] + [VK_Q] * (n - target)
 
         if self.control_type != "2-handle":
             diff = target - current
@@ -957,30 +989,57 @@ class App:
             return
 
         # ── 5. 轴值 → 目标档位 ──────────────────────────────────
-        if axis_val is not None:
-            if (cfg["axis_mapping_mode"] == "segmented"
-                    and len(cfg.get("axis_calibration", {})) >= 2):
-                target = axis_to_notch_calibrated(
-                    axis_val,
-                    cfg["axis_calibration"],
-                    self.total_notches,
-                )
-            else:
+        if self.is_185_real:
+            if axis_val is not None:
                 target = axis_to_notch(axis_val, self.total_notches,
                                        cfg["axis_invert"], cfg["deadzone"])
+            else:
+                target = None
+
+            brake_axis = None
+            if js:
+                brake_axis_idx = cfg.get("axis2_index", cfg["axis_index"])
+                if js.get_numaxes() > brake_axis_idx:
+                    brake_axis = js.get_axis(brake_axis_idx)
+            if brake_axis is not None:
+                brake_target = axis_to_notch(
+                    brake_axis,
+                    self._185_brake_total,
+                    cfg["axis_invert"],
+                    cfg["deadzone"],
+                )
+            else:
+                brake_target = None
         else:
-            target = None
+            if axis_val is not None:
+                if (cfg["axis_mapping_mode"] == "segmented"
+                        and len(cfg.get("axis_calibration", {})) >= 2):
+                    target = axis_to_notch_calibrated(
+                        axis_val,
+                        cfg["axis_calibration"],
+                        self.total_notches,
+                    )
+                else:
+                    target = axis_to_notch(axis_val, self.total_notches,
+                                           cfg["axis_invert"], cfg["deadzone"])
+            else:
+                target = None
+            brake_target = None
 
         # ── 6. 未同步时跳过 ─────────────────────────────────────
-        if self.current_notch is None:
+        if self.current_notch is None or (self.is_185_real and self.current_brake_notch is None):
             self.queue.tick(cfg["key_interval_ms"])
             return
 
         # ── 7. 计算差量，填充队列 ────────────────────────────────
         # 注意：不在此处更新 current_notch；由步骤8每发一键更新一步，
         # 确保焦点丢失导致队列被清空时 current_notch 仍与游戏实际档位吻合。
-        if target is not None and target != self.current_notch and len(self.queue) == 0:
-            self.queue.push(self._build_transition_keys(self.current_notch, target))
+        if len(self.queue) == 0:
+            if self.is_185_real and brake_target is not None and brake_target != self.current_brake_notch:
+                diff = brake_target - self.current_brake_notch
+                self.queue.push([VK_COMMA] * diff if diff > 0 else [VK_DOT] * abs(diff))
+            elif target is not None and target != self.current_notch:
+                self.queue.push(self._build_transition_keys(self.current_notch, target))
 
         # ── 8. 发送一个按键，同步更新 current_notch ─────────────
         sent = self.queue.tick(cfg["key_interval_ms"])
@@ -988,18 +1047,23 @@ class App:
             vk = self.queue.last_sent_vk
             total = self.total_notches
             if self.is_185_real:
-                if vk == VK_Q and self.current_notch >= self.n_index:
-                    self.current_notch = min(total - 1, self.current_notch + 1)
-                elif vk == VK_Z and self.current_notch > self.n_index:
-                    self.current_notch = max(self.n_index, self.current_notch - 1)
+                if vk == VK_Q and self.current_notch > 0:
+                    self.current_notch -= 1
+                elif vk == VK_Z and self.current_notch < total - 1:
+                    self.current_notch += 1
+                elif vk == VK_A and self.current_notch != self.n_index:
+                    if self.current_notch < self.n_index:
+                        self.current_notch = min(self.n_index, self.current_notch + 1)
+                    else:
+                        self.current_notch = max(self.n_index, self.current_notch - 1)
                 elif vk == VK_S:
                     self.current_notch = self.n_index
-                elif vk == VK_M:
-                    self.current_notch = self.n_index
                 elif vk == VK_DOT:
-                    self.current_notch = max(0, self.current_notch - 1)
-                elif vk == VK_COMMA and self.current_notch < self.n_index:
-                    self.current_notch = min(self.n_index, self.current_notch + 1)
+                    self.current_brake_notch = max(0, self.current_brake_notch - 1)
+                elif vk == VK_COMMA:
+                    self.current_brake_notch = min(self._185_brake_running_index, self.current_brake_notch + 1)
+                elif vk == VK_M:
+                    self.current_brake_notch = self._185_brake_running_index
             elif vk == VK_Z:
                 self.current_notch = min(total - 1, self.current_notch + 1)
             elif vk == VK_Q:
@@ -1270,7 +1334,7 @@ class App:
         foc_text = "\u25cf \u5df2\u805a\u7126" if self.game_focused else "\u25cf \u672a\u805a\u7126"
         if self.syncing:
             syn_color, syn_text = COLOR_YELLOW, "\u25cf \u540c\u6b65\u4e2d"
-        elif self.current_notch is None:
+        elif not self.is_synced:
             syn_color, syn_text = COLOR_RED, "\u25cf \u672a\u540c\u6b65"
         else:
             syn_color, syn_text = COLOR_GREEN, "\u25cf \u5df2\u540c\u6b65"
@@ -1308,21 +1372,44 @@ class App:
         if eb:
             draw_text(surf, self.fonts["lg"], "EB",    COLOR_RED,   text_x, text_y)
             draw_text(surf, self.fonts["md"], "紧急制动", COLOR_RED, text_x, text_y + 44)
-        elif cur is None:
+        elif not self.is_synced:
             draw_text(surf, self.fonts["md"], "未同步", COLOR_GRAY, text_x, text_y + 20)
             draw_text(surf, self.fonts["sm"], "请先执行归位同步", COLOR_DIM, text_x, text_y + 50)
         else:
             name  = names[cur] if 0 <= cur < len(names) else "?"
             color = notch_color(name)
             desc  = notch_description(name)
-            draw_text(surf, self.fonts["lg"], name,  color, text_x, text_y)
-            draw_text(surf, self.fonts["md"], desc,  color, text_x, text_y + 44)
-            draw_text(surf, self.fonts["sm"], f"{cur} / {total - 1}", COLOR_GRAY, text_x, text_y + 74)
+            if self.is_185_real and self.current_brake_notch is not None:
+                brake_name = self._185_brake_names()[self.current_brake_notch]
+                brake_color = COLOR_GRAY if brake_name == "Running" else COLOR_ORANGE
+                brake_desc = "Running" if brake_name == "Running" else "Service Brake"
+                power_name = name
+                power_color = color
+                power_desc = "Neutral" if name == "N" else desc
 
-            # 待发队列提示
-            if len(self.queue) > 0:
+                draw_text(surf, self.fonts["sm"], "Brake", COLOR_DIM, text_x, text_y)
+                draw_text(surf, self.fonts["lg"], brake_name, brake_color, text_x, text_y + 18)
+                draw_text(surf, self.fonts["md"], brake_desc, brake_color, text_x, text_y + 62)
+                draw_text(surf, self.fonts["sm"], "Power / Hold", COLOR_DIM, text_x, text_y + 106)
+                draw_text(surf, self.fonts["lg"], power_name, power_color, text_x, text_y + 124)
+                draw_text(surf, self.fonts["md"], power_desc, power_color, text_x, text_y + 168)
                 draw_text(surf, self.fonts["sm"],
-                          f"发送中… {len(self.queue)} 键", COLOR_YELLOW, text_x, text_y + 100)
+                          f"PH {cur} / {total - 1} | BR {self.current_brake_notch} / {self._185_brake_running_index}",
+                          COLOR_GRAY, text_x, text_y + 206)
+            else:
+                draw_text(surf, self.fonts["lg"], name,  color, text_x, text_y)
+                draw_text(surf, self.fonts["md"], desc,  color, text_x, text_y + 44)
+                draw_text(surf, self.fonts["sm"], f"{cur} / {total - 1}", COLOR_GRAY, text_x, text_y + 74)
+
+            if len(self.queue) > 0:
+                draw_text(
+                    surf,
+                    self.fonts["sm"],
+                    f"发送中… {len(self.queue)} 键",
+                    COLOR_YELLOW,
+                    text_x,
+                    text_y + (232 if self.is_185_real else 100),
+                )
 
     # ── 竖向档位条 ─────────────────────────────────────────────────────
     def _draw_notch_bar(self, surf, rect, names, cur, eb_active):

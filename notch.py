@@ -23,7 +23,7 @@ def notch_color(name):
     if name.startswith("B"):
         return COLOR_ORANGE
     if name.startswith("H"):
-        return COLOR_BLUE
+        return COLOR_ORANGE
     if name == "HB":
         return COLOR_ORANGE
     if name == "N":
