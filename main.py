@@ -504,6 +504,7 @@ class SelectOverlay:
         self.title   = title
         self.items   = items
         self.cursor  = 0
+        self.max_visible = 8
 
     def handle_key(self, event):
         if event.key == pygame.K_UP:
@@ -524,7 +525,8 @@ class SelectOverlay:
 
         item_h = 36
         pad    = 20
-        list_h = min(len(self.items), 8) * item_h + 60
+        visible_count = min(len(self.items), self.max_visible)
+        list_h = visible_count * item_h + 60
         box    = pygame.Rect(pad, (WIN_H - list_h) // 2, WIN_W - pad * 2, list_h)
 
         pygame.draw.rect(surf, COLOR_PANEL, box, border_radius=8)
@@ -533,13 +535,18 @@ class SelectOverlay:
         draw_text(surf, fonts["md"], self.title, COLOR_WHITE,
                   box.centerx, box.y + 14, anchor="center")
 
+        start = 0
+        if len(self.items) > visible_count:
+            start = max(0, min(self.cursor - visible_count + 1, len(self.items) - visible_count))
+
         y = box.y + 44
-        for i, item in enumerate(self.items[:8]):
+        for item_idx in range(start, start + visible_count):
+            item = self.items[item_idx]
             row = pygame.Rect(box.x + 8, y, box.width - 16, item_h - 4)
-            if i == self.cursor:
+            if item_idx == self.cursor:
                 pygame.draw.rect(surf, COLOR_BTN_ACT, row, border_radius=4)
             draw_text(surf, fonts["sm"], item,
-                      COLOR_WHITE if i == self.cursor else COLOR_GRAY,
+                      COLOR_WHITE if item_idx == self.cursor else COLOR_GRAY,
                       row.x + 10, row.y + (item_h - 4 - fonts["sm"].get_height()) // 2)
             y += item_h
 

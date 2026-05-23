@@ -28,5 +28,29 @@
     "power_notches": 5,
     "brake_notches": 8,
     "has_hb": false
+  },
+  "E233-3000（东海道线）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E233（中央线快速）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E211（大糸线）": {
+    "control_type": "2-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "Kiha E130-500系（八户线）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
   }
 }
