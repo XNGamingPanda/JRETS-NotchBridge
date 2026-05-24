@@ -88,8 +88,8 @@ ROUTE_OPTIONS = {
     "湘南新宿线": ["E233-3000系", "E231系（近郊型）", "185系"],
     "仙石线": ["205-3100系"],
     "小海线": ["KiHa E200系"],
-    "京叶线": ["E233-5000系"],
-    "仙山线": ["E721系"],
+    "京叶线": ["E233-5000系", "209-500系"],
+    "仙山线": ["E721-1000系"],
     "男鹿线": ["EV-E801系"],
     "中央线快速": ["E233系"],
     "大糸线": ["E211系"],
@@ -103,6 +103,7 @@ VEHICLE_ALIASES = {
     "209-500系": "209-500系",
     "209-500系（京滨东北・根岸线）": "209-500系",
     "209-500系（京滨东北 · 根岸线）": "209-500系",
+    "209-500系（京叶线）": "209-500系",
     "205-3100系": "205-3100系",
     "205-3100系（仙石线）": "205-3100系",
     "E235-0（山手线）": "E235-0系",
@@ -122,8 +123,10 @@ VEHICLE_ALIASES = {
     "E231系（近郊タイプ）": "E231系（近郊型）",
     "E231系（近郊型）（东海道线）": "E231系（近郊型）",
     "E231系（近郊型）（湘南新宿线）": "E231系（近郊型）",
-    "E721系": "E721系",
-    "E721系（仙山线）": "E721系",
+    "E721系": "E721-1000系",
+    "E721-1000系": "E721-1000系",
+    "E721系（仙山线）": "E721-1000系",
+    "E721-1000系（仙山线）": "E721-1000系",
     "EV-E801系": "EV-E801系",
     "EV-E801系（男鹿线）": "EV-E801系",
     "E233（中央线快速）": "E233系",
@@ -659,9 +662,12 @@ class SelectOverlay:
     def _max_scroll(self):
         return max(0, len(self.items) - self._visible_count())
 
+    def _clamp_scroll(self):
+        self.scroll = max(0, min(self.scroll, self._max_scroll()))
+
     def _ensure_cursor_visible(self):
         visible = self._visible_count()
-        self.scroll = max(0, min(self.scroll, self._max_scroll()))
+        self._clamp_scroll()
         if self.cursor < self.scroll:
             self.scroll = self.cursor
         elif self.cursor >= self.scroll + visible:
@@ -715,7 +721,7 @@ class SelectOverlay:
         draw_button(surf, fonts["sm"], "X", self.close_rect,
                     hover=self.close_rect.collidepoint(pygame.mouse.get_pos()))
 
-        self._ensure_cursor_visible()
+        self._clamp_scroll()
         start = self.scroll
         self.body_rect = pygame.Rect(box.x + 8, box.y + 44, box.width - 24, visible_count * item_h)
 

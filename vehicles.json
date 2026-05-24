@@ -50,8 +50,8 @@
   "KiHa E200系": {
     "control_type": "1-handle",
     "power_notches": 5,
-    "brake_notches": 8,
-    "has_hb": false
+    "brake_notches": 7,
+    "has_hb": true
   },
   "E233-3000系": {
     "control_type": "1-handle",
@@ -71,17 +71,17 @@
     "brake_notches": 8,
     "has_hb": false
   },
-  "E721系": {
+  "E721-1000系": {
     "control_type": "1-handle",
     "power_notches": 5,
-    "brake_notches": 8,
-    "has_hb": false
+    "brake_notches": 7,
+    "has_hb": true
   },
   "EV-E801系": {
     "control_type": "1-handle",
     "power_notches": 5,
-    "brake_notches": 8,
-    "has_hb": false
+    "brake_notches": 7,
+    "has_hb": true
   },
   "E233系": {
     "control_type": "1-handle",
