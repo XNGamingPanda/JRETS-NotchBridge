@@ -29,6 +29,7 @@ from focus_checker import FocusChecker
 # 窗口尺寸与区域划分
 # ──────────────────────────────────────────────────────────────────────
 WIN_W, WIN_H = 400, 660
+MIN_WIN_W, MIN_WIN_H = 400, 560
 STATUS_H     = 70    # 顶部状态栏高度
 MAIN_H       = 260   # 主显示区高度（档位条 + 文字）
 CTRL_Y       = STATUS_H + MAIN_H   # 操作区起始 y
@@ -70,43 +71,73 @@ def get_appdata_dir():
 RESOURCE_BASE = get_resource_base()
 APPDATA_DIR   = get_appdata_dir()
 CONFIG_PATH   = os.path.join(APPDATA_DIR, "config.json")
-VEHICLES_PATH = os.path.join(APPDATA_DIR, "vehicles.json")
+VEHICLES_PATH = os.path.join(RESOURCE_BASE, "vehicles.json")
+LEGACY_APPDATA_VEHICLES_PATH = os.path.join(APPDATA_DIR, "vehicles.json")
 LEGACY_CONFIG_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 LEGACY_VEHICLES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vehicles.json")
 DEFAULT_VEHICLES_PATH = os.path.join(RESOURCE_BASE, "vehicles.json")
 
 ROUTE_OPTIONS = {
-    "京滨东北・根岸线": ["E233-1000系"],
+    "京滨东北 · 根岸线": ["E233-1000系", "209-500系"],
     "山手线": ["E235-0系"],
     "总武快速线・成田线": ["E217系"],
-    "东海道货物线": ["E257-5500系/E257-2000系"],
+    "成田线&鹿岛线": ["209-2100系"],
+    "东海道货物线": ["E257-5500系/E257-2000系", "185系"],
     "留萌本线": ["Kiha 54-500系"],
-    "东海道线": ["E233-3000系", "185系"],
-    "湘南新宿线": ["E233-3000系", "185系"],
+    "东海道线": ["E233-3000系", "E231系（近郊型）", "185系"],
+    "湘南新宿线": ["E233-3000系", "E231系（近郊型）", "185系"],
+    "仙石线": ["205-3100系"],
+    "小海线": ["KiHa E200系"],
+    "京叶线": ["E233-5000系"],
+    "仙山线": ["E721系"],
+    "男鹿线": ["EV-E801系"],
     "中央线快速": ["E233系"],
     "大糸线": ["E211系"],
     "八户线": ["Kiha E130-500系"],
 }
 
 VEHICLE_ALIASES = {
+    "E233-1000系": "E233-1000系",
     "E233-1000（京滨东北・根岸线）": "E233-1000系",
+    "E233-1000（京滨东北 · 根岸线）": "E233-1000系",
+    "209-500系": "209-500系",
+    "209-500系（京滨东北・根岸线）": "209-500系",
+    "209-500系（京滨东北 · 根岸线）": "209-500系",
+    "205-3100系": "205-3100系",
+    "205-3100系（仙石线）": "205-3100系",
     "E235-0（山手线）": "E235-0系",
     "E217（总武快速线 成田线）": "E217系",
+    "209-2100系": "209-2100系",
+    "209-2100系（成田线&鹿岛线）": "209-2100系",
     "E257-5500&E257-2000（东海道货物线）": "E257-5500系/E257-2000系",
     "Kiha 54-500（留萌本线）": "Kiha 54-500系",
+    "KiHa E200系": "KiHa E200系",
+    "KiHa E200系（小海线）": "KiHa E200系",
     "E233-3000（东海道线）": "E233-3000系",
     "E233-3000（湘南新宿线）": "E233-3000系",
+    "E233-5000系": "E233-5000系",
+    "E233-5000系（京叶线）": "E233-5000系",
+    "E231系（近郊型）": "E231系（近郊型）",
+    "E231系近郊型": "E231系（近郊型）",
+    "E231系（近郊タイプ）": "E231系（近郊型）",
+    "E231系（近郊型）（东海道线）": "E231系（近郊型）",
+    "E231系（近郊型）（湘南新宿线）": "E231系（近郊型）",
+    "E721系": "E721系",
+    "E721系（仙山线）": "E721系",
+    "EV-E801系": "EV-E801系",
+    "EV-E801系（男鹿线）": "EV-E801系",
     "E233（中央线快速）": "E233系",
     "E211（大糸线）": "E211系",
     "Kiha E130-500系（八户线）": "Kiha E130-500系",
     "185-0系（东海道线）": "185系",
     "185-200系（湘南新宿线）": "185系",
+    "185-0系（东海道货物线）": "185系",
     "185-0系": "185系",
     "185-200系": "185系",
 }
 
 DEFAULT_CONFIG = {
-    "selected_route": "京滨东北・根岸线",
+    "selected_route": "京滨东北 · 根岸线",
     "selected_vehicle": "E233-1000系",
     "joystick_index": 0,
     "axis_index": 0,
@@ -137,12 +168,6 @@ DEFAULT_CONFIG = {
 
 def ensure_appdata_files():
     os.makedirs(APPDATA_DIR, exist_ok=True)
-
-    if not os.path.exists(VEHICLES_PATH):
-        if os.path.exists(LEGACY_VEHICLES_PATH):
-            shutil.copy2(LEGACY_VEHICLES_PATH, VEHICLES_PATH)
-        elif os.path.exists(DEFAULT_VEHICLES_PATH):
-            shutil.copy2(DEFAULT_VEHICLES_PATH, VEHICLES_PATH)
 
     if not os.path.exists(CONFIG_PATH) and os.path.exists(LEGACY_CONFIG_PATH):
         shutil.copy2(LEGACY_CONFIG_PATH, CONFIG_PATH)
@@ -191,7 +216,7 @@ def load_config():
         return cfg
     cfg = dict(DEFAULT_CONFIG)
     cfg.update({
-        "selected_route": "京滨东北・根岸线",
+        "selected_route": "京滨东北 · 根岸线",
         "selected_vehicle": "E233-1000系",
         "button_horn": -1,
         "button_skip_stop": -1,
@@ -209,7 +234,14 @@ def save_config(cfg):
 
 def load_vehicles():
     ensure_appdata_files()
-    with open(VEHICLES_PATH, "r", encoding="utf-8") as f:
+    vehicle_path = None
+    for candidate in [VEHICLES_PATH, LEGACY_VEHICLES_PATH, LEGACY_APPDATA_VEHICLES_PATH]:
+        if os.path.exists(candidate):
+            vehicle_path = candidate
+            break
+    if vehicle_path is None:
+        raise FileNotFoundError("vehicles.json not found in packaged resources or legacy locations")
+    with open(vehicle_path, "r", encoding="utf-8") as f:
         return normalize_vehicles(json.load(f))
 
 
@@ -307,6 +339,7 @@ class AxisMonitorPanel:
         self.selected_axis = 0
         self.selected_axis2 = 1
         self.target = "main"
+        self._clickables: list[tuple[tuple[str, int] | str, pygame.Rect]] = []
 
     def tick(self, js):
         if js is None:
@@ -333,8 +366,33 @@ class AxisMonitorPanel:
     def toggle_target(self):
         self.target = "sub" if self.target == "main" else "main"
 
+    def handle_click(self, pos):
+        for cid, rect in self._clickables:
+            if rect.collidepoint(pos):
+                if cid == "target_main":
+                    self.target = "main"
+                    return None
+                if cid == "target_sub":
+                    self.target = "sub"
+                    return None
+                kind, axis_idx = cid
+                if kind == "main":
+                    self.selected_axis = axis_idx
+                    return ("main", axis_idx)
+                if kind == "sub":
+                    self.selected_axis2 = axis_idx
+                    return ("sub", axis_idx)
+                if kind == "row":
+                    if self.target == "sub":
+                        self.selected_axis2 = axis_idx
+                        return ("sub", axis_idx)
+                    self.selected_axis = axis_idx
+                    return ("main", axis_idx)
+        return None
+
     def draw(self, surf, fonts, rect, js):
         """在 rect 区域内绘制轴监视内容。"""
+        self._clickables = []
         font = fonts["sm"]
         x, y = rect.x + 10, rect.y + 8
 
@@ -342,12 +400,18 @@ class AxisMonitorPanel:
             draw_text(surf, font, "未检测到手柄", COLOR_RED, x, y)
             return
 
-        target_label = "副轴" if self.target == "sub" else "主轴"
-        draw_text(surf, font, f"拨动摇杆高亮轴；Tab切换目标；Enter 设为{target_label}", COLOR_YELLOW, x, y)
-        y += 22
+        draw_text(surf, font, "拨动摇杆高亮轴；点击行可分配当前目标", COLOR_YELLOW, x, y)
+        btn_y = y + 20
+        main_btn = pygame.Rect(rect.right - 134, y - 2, 58, 22)
+        sub_btn = pygame.Rect(rect.right - 68, y - 2, 58, 22)
+        draw_button(surf, font, "主轴目标", main_btn, hover=main_btn.collidepoint(pygame.mouse.get_pos()), active=(self.target == "main"))
+        draw_button(surf, font, "副轴目标", sub_btn, hover=sub_btn.collidepoint(pygame.mouse.get_pos()), active=(self.target == "sub"))
+        self._clickables.append(("target_main", main_btn))
+        self._clickables.append(("target_sub", sub_btn))
+        y += 30
 
         row_h = 30
-        bar_w = rect.width - 130
+        bar_w = rect.width - 210
         for i in range(js.get_numaxes()):
             val = self.prev_vals.get(i, 0.0)
             is_max = (i == self.max_delta_axis)
@@ -360,6 +424,7 @@ class AxisMonitorPanel:
                 pygame.draw.rect(surf, (60, 55, 10), row_rect, border_radius=3)
             elif is_sel:
                 pygame.draw.rect(surf, (15, 45, 25), row_rect, border_radius=3)
+            self._clickables.append((("row", i), row_rect))
 
             markers = []
             if is_main:
@@ -382,6 +447,12 @@ class AxisMonitorPanel:
             pygame.draw.line(surf, COLOR_GRAY, (mid, by), (mid, by + 10))
 
             draw_text(surf, font, f"{val:+.3f}", COLOR_WHITE, bx + bar_w + 6, y + 2)
+            main_r = pygame.Rect(rect.right - 68, y, 26, 20)
+            sub_r = pygame.Rect(rect.right - 36, y, 26, 20)
+            draw_button(surf, font, "主", main_r, hover=main_r.collidepoint(pygame.mouse.get_pos()), active=is_main)
+            draw_button(surf, font, "副", sub_r, hover=sub_r.collidepoint(pygame.mouse.get_pos()), active=is_sub)
+            self._clickables.append((("main", i), main_r))
+            self._clickables.append((("sub", i), sub_r))
             y += row_h
             if y + row_h > rect.bottom - 4:
                 break
@@ -561,52 +632,117 @@ class SelectOverlay:
         self.items   = items
         self.cursor  = 0
         self.max_visible = 8
+        self.scroll = 0
+        self.box = pygame.Rect(0, 0, 0, 0)
+        self.close_rect = pygame.Rect(0, 0, 0, 0)
+        self.row_rects: list[tuple[int, pygame.Rect]] = []
+        self.body_rect = pygame.Rect(0, 0, 0, 0)
+        self.scrollbar_track = pygame.Rect(0, 0, 0, 0)
+        self.scrollbar_thumb = pygame.Rect(0, 0, 0, 0)
 
     def handle_key(self, event):
         if event.key == pygame.K_UP:
             self.cursor = (self.cursor - 1) % len(self.items)
+            self._ensure_cursor_visible()
         elif event.key == pygame.K_DOWN:
             self.cursor = (self.cursor + 1) % len(self.items)
+            self._ensure_cursor_visible()
         elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             return "confirm"
         elif event.key == pygame.K_ESCAPE:
             return "cancel"
         return None
 
+    def _visible_count(self):
+        return min(len(self.items), self.max_visible)
+
+    def _max_scroll(self):
+        return max(0, len(self.items) - self._visible_count())
+
+    def _ensure_cursor_visible(self):
+        visible = self._visible_count()
+        self.scroll = max(0, min(self.scroll, self._max_scroll()))
+        if self.cursor < self.scroll:
+            self.scroll = self.cursor
+        elif self.cursor >= self.scroll + visible:
+            self.scroll = self.cursor - visible + 1
+
+    def scroll_by(self, delta):
+        self.scroll = max(0, min(self.scroll + delta, self._max_scroll()))
+
+    def handle_wheel(self, delta):
+        if self._max_scroll() > 0:
+            self.scroll_by(-delta)
+
+    def handle_click(self, pos):
+        if not self.box.collidepoint(pos):
+            return "cancel"
+        if self.close_rect.collidepoint(pos):
+            return "cancel"
+        for item_idx, rect in self.row_rects:
+            if rect.collidepoint(pos):
+                self.cursor = item_idx
+                self._ensure_cursor_visible()
+                return "confirm"
+        if self.scrollbar_track.collidepoint(pos) and self._max_scroll() > 0:
+            if pos[1] < self.scrollbar_thumb.y:
+                self.scroll_by(-self._visible_count())
+            elif pos[1] > self.scrollbar_thumb.bottom:
+                self.scroll_by(self._visible_count())
+        return None
+
     def draw(self, surf, fonts):
+        win_w, win_h = surf.get_size()
         # 半透明遮罩
-        overlay = pygame.Surface((WIN_W, WIN_H), pygame.SRCALPHA)
+        overlay = pygame.Surface((win_w, win_h), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
         surf.blit(overlay, (0, 0))
 
         item_h = 36
         pad    = 20
-        visible_count = min(len(self.items), self.max_visible)
+        visible_count = self._visible_count()
         list_h = visible_count * item_h + 60
-        box    = pygame.Rect(pad, (WIN_H - list_h) // 2, WIN_W - pad * 2, list_h)
+        box    = pygame.Rect(pad, (win_h - list_h) // 2, win_w - pad * 2, list_h)
+        self.box = box
+        self.row_rects = []
 
         pygame.draw.rect(surf, COLOR_PANEL, box, border_radius=8)
         pygame.draw.rect(surf, COLOR_BORDER, box, 1, border_radius=8)
 
         draw_text(surf, fonts["md"], self.title, COLOR_WHITE,
                   box.centerx, box.y + 14, anchor="center")
+        self.close_rect = pygame.Rect(box.right - 30, box.y + 10, 20, 20)
+        draw_button(surf, fonts["sm"], "X", self.close_rect,
+                    hover=self.close_rect.collidepoint(pygame.mouse.get_pos()))
 
-        start = 0
-        if len(self.items) > visible_count:
-            start = max(0, min(self.cursor - visible_count + 1, len(self.items) - visible_count))
+        self._ensure_cursor_visible()
+        start = self.scroll
+        self.body_rect = pygame.Rect(box.x + 8, box.y + 44, box.width - 24, visible_count * item_h)
 
         y = box.y + 44
         for item_idx in range(start, start + visible_count):
+            if item_idx >= len(self.items):
+                break
             item = self.items[item_idx]
-            row = pygame.Rect(box.x + 8, y, box.width - 16, item_h - 4)
+            row = pygame.Rect(box.x + 8, y, box.width - 28, item_h - 4)
             if item_idx == self.cursor:
                 pygame.draw.rect(surf, COLOR_BTN_ACT, row, border_radius=4)
             draw_text(surf, fonts["sm"], item,
                       COLOR_WHITE if item_idx == self.cursor else COLOR_GRAY,
                       row.x + 10, row.y + (item_h - 4 - fonts["sm"].get_height()) // 2)
+            self.row_rects.append((item_idx, row))
             y += item_h
 
-        draw_text(surf, fonts["sm"], "↑↓选择  Enter确认  Esc取消",
+        self.scrollbar_track = pygame.Rect(box.right - 14, box.y + 46, 6, visible_count * item_h - 8)
+        self.scrollbar_thumb = pygame.Rect(0, 0, 0, 0)
+        if self._max_scroll() > 0:
+            pygame.draw.rect(surf, (58, 58, 66), self.scrollbar_track, border_radius=3)
+            thumb_h = max(24, int(self.scrollbar_track.height * (visible_count / len(self.items))))
+            thumb_y = self.scrollbar_track.y + int((self.scrollbar_track.height - thumb_h) * (self.scroll / self._max_scroll()))
+            self.scrollbar_thumb = pygame.Rect(self.scrollbar_track.x, thumb_y, self.scrollbar_track.width, thumb_h)
+            pygame.draw.rect(surf, COLOR_BORDER, self.scrollbar_thumb, border_radius=3)
+
+        draw_text(surf, fonts["sm"], "滚轮滚动  单击确认  外部/右上角关闭",
                   COLOR_DIM, box.centerx, box.bottom - 18, anchor="center")
 
 
@@ -627,7 +763,7 @@ class App:
         self.veh_names = list(self.vehicles.keys())
         self.route_names = list(ROUTE_OPTIONS.keys())
 
-        self.screen = pygame.display.set_mode((WIN_W, WIN_H))
+        self.screen = pygame.display.set_mode((WIN_W, WIN_H), pygame.RESIZABLE)
         pygame.display.set_caption("JRETS Controller")
         self._set_always_on_top()
 
@@ -665,6 +801,11 @@ class App:
         self.interval_editing: bool = False
         self.settings_open: bool = False
         self.pending_route: str | None = None
+        self.controls_panel_h: float = self._collapsed_controls_height()
+        self.controls_target_h: float = self._collapsed_controls_height()
+        self.settings_scroll: float = 0.0
+        self.settings_body_rect = pygame.Rect(0, 0, 0, 0)
+        self.settings_content_h: float = 0.0
 
         # 鼠标悬停追踪
         self.hover_rect_id: str = ""
@@ -706,6 +847,63 @@ class App:
     @property
     def current_route(self):
         return self.cfg.get("selected_route", route_for_vehicle(self.cfg["selected_vehicle"]))
+
+    def _settings_content_height(self):
+        btn_h = 26
+        row_gap = 4
+        y = 0
+        y += btn_h + 8   # 设备行
+        y += btn_h + 8   # 主轴行
+        y += btn_h + 8   # 双轴平均行
+        y += (btn_h + row_gap) * 3  # 常规按键映射
+        y += btn_h + 4   # 间隔/轴末端EB/标定
+        y += 6 + 6       # 分隔线与留白
+        y += btn_h + 6   # 插件开关
+        y += (btn_h + row_gap) * 2  # 插件按键映射
+        return y
+
+    def _collapsed_controls_height(self):
+        return 42
+
+    def _layout_metrics(self):
+        win_w, win_h = self.screen.get_size()
+        ctrl_h = self.controls_panel_h
+        main_h = max(160, win_h - STATUS_H - ctrl_h)
+        ctrl_y = STATUS_H + main_h
+        ctrl_h = win_h - ctrl_y
+        return {
+            "win_w": win_w,
+            "win_h": win_h,
+            "main_h": main_h,
+            "ctrl_y": ctrl_y,
+            "ctrl_h": ctrl_h,
+        }
+
+    def _get_settings_body_rect(self, panel_rect: pygame.Rect) -> pygame.Rect:
+        body_top = panel_rect.y + 8 + 26 + 8
+        return pygame.Rect(panel_rect.x, body_top, panel_rect.width, max(0, panel_rect.bottom - body_top))
+
+    def _clamp_settings_scroll(self):
+        max_scroll = max(0.0, self.settings_content_h - self.settings_body_rect.height)
+        self.settings_scroll = max(0.0, min(self.settings_scroll, max_scroll))
+
+    def _scroll_settings(self, delta: float):
+        if self.settings_body_rect.height <= 0:
+            return
+        self._clamp_settings_scroll()
+        max_scroll = max(0.0, self.settings_content_h - self.settings_body_rect.height)
+        if max_scroll <= 0:
+            self.settings_scroll = 0.0
+            return
+        self.settings_scroll = max(0.0, min(self.settings_scroll + delta, max_scroll))
+
+    def _resize_window(self, width: int, height: int):
+        global WIN_W, WIN_H
+        width = max(MIN_WIN_W, int(width))
+        height = max(MIN_WIN_H, int(height))
+        WIN_W, WIN_H = width, height
+        self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+        self._set_always_on_top()
 
     @property
     def notch_names(self):
@@ -925,6 +1123,15 @@ class App:
                         self.horn_held = False
                     running = False
 
+                elif event.type == pygame.VIDEORESIZE:
+                    self._resize_window(event.w, event.h)
+
+                elif event.type == pygame.MOUSEWHEEL:
+                    if self.overlay:
+                        self.overlay.handle_wheel(event.y)
+                    elif self.settings_body_rect.collidepoint(mouse_pos):
+                        self._scroll_settings(-event.y * 32)
+
                 elif event.type == pygame.KEYDOWN:
                     if self.overlay:
                         result = self.overlay.handle_key(event)
@@ -974,7 +1181,14 @@ class App:
                             running = False
 
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if not self.overlay:
+                    if self.overlay:
+                        result = self.overlay.handle_click(event.pos)
+                        if result == "confirm":
+                            self._overlay_confirm()
+                        elif result == "cancel":
+                            self.pending_route = None
+                            self.overlay = None
+                    else:
                         if self.calibration_active:
                             names = self.notch_names
                             cal   = self.cfg["axis_calibration"]
@@ -986,8 +1200,23 @@ class App:
                             if result == "done":
                                 self.calibration_active = False
                                 save_config(self.cfg)
+                        elif self.axis_monitor_active:
+                            result = self.axis_panel.handle_click(event.pos)
+                            if result is not None:
+                                target, ax = result
+                                if target == "sub":
+                                    self.cfg["axis2_index"] = ax
+                                else:
+                                    self.cfg["axis_index"] = ax
+                                save_config(self.cfg)
                         else:
                             self._handle_click(event.pos)
+
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                    if self.overlay:
+                        self.overlay.handle_wheel(1 if event.button == 4 else -1)
+                    elif self.settings_body_rect.collidepoint(event.pos):
+                        self._scroll_settings(-32 if event.button == 4 else 32)
 
                 # 手柄按钮事件
                 elif event.type == pygame.JOYBUTTONDOWN:
@@ -1016,6 +1245,16 @@ class App:
     def _frame_logic(self):
         # 后台运行时手动 pump，确保手柄轴值始终是最新状态
         pygame.event.pump()
+
+        target_h = (
+            self._settings_content_height()
+            if self.settings_open
+            else self._collapsed_controls_height()
+        )
+        self.controls_target_h = target_h
+        self.controls_panel_h += (self.controls_target_h - self.controls_panel_h) * 0.25
+        if abs(self.controls_panel_h - self.controls_target_h) < 0.5:
+            self.controls_panel_h = self.controls_target_h
 
         js  = self.js
         cfg = self.cfg
@@ -1266,6 +1505,11 @@ class App:
 
         elif cid == "btn_settings":
             self.settings_open = not self.settings_open
+            self.controls_target_h = (
+                self._settings_content_height()
+                if self.settings_open
+                else self._collapsed_controls_height()
+            )
 
         elif cid == "btn_device":
             devices = [f"[{i}] {pygame.joystick.Joystick(i).get_name()}"
@@ -1379,12 +1623,13 @@ class App:
         self._clickables = []
         surf = self.screen
         surf.fill(COLOR_BG)
+        layout = self._layout_metrics()
 
         self._draw_status_bar(surf, mouse_pos)
         self._draw_divider(surf, STATUS_H)
 
         if self.calibration_active:
-            cal_rect = pygame.Rect(0, STATUS_H, WIN_W, MAIN_H)
+            cal_rect = pygame.Rect(0, STATUS_H, layout["win_w"], layout["main_h"])
             self.cal_panel.draw(
                 surf, self.fonts, cal_rect,
                 self.notch_names, self.cfg["axis_calibration"],
@@ -1395,7 +1640,7 @@ class App:
         else:
             self._draw_main_display(surf, mouse_pos)
 
-        self._draw_divider(surf, CTRL_Y)
+        self._draw_divider(surf, layout["ctrl_y"])
         self._draw_controls(surf, mouse_pos)
 
         if self.button_learn_target:
@@ -1413,13 +1658,14 @@ class App:
 
     # ── 顶部状态栏 ─────────────────────────────────────────────────────
     def _draw_status_bar(self, surf, mouse_pos):
-        pygame.draw.rect(surf, COLOR_PANEL, (0, 0, WIN_W, STATUS_H))
+        win_w, _ = surf.get_size()
+        pygame.draw.rect(surf, COLOR_PANEL, (0, 0, win_w, STATUS_H))
         fn, fm = self.fonts["sm"], self.fonts["md"]
 
         route_name = self.current_route
         vehicle_name = self.cfg["selected_vehicle"]
 
-        right_x = WIN_W - 152
+        right_x = win_w - 152
         left_w = right_x - 18
 
         route_full = f"线路: {route_name}"
@@ -1453,19 +1699,20 @@ class App:
                 draw_tooltip(surf, fn, vehicle_full, mouse_pos[0] + 10, mouse_pos[1])
 
     def _draw_main_display(self, surf, mouse_pos):
+        layout = self._layout_metrics()
         names  = self.notch_names
         total  = self.total_notches
         cur    = self.current_notch
         eb     = self.eb_active
 
-        main_rect = pygame.Rect(0, STATUS_H, WIN_W, MAIN_H)
+        main_rect = pygame.Rect(0, STATUS_H, layout["win_w"], layout["main_h"])
 
         # EB 状态：背景变红
         if eb:
             pygame.draw.rect(surf, COLOR_EB_BG, main_rect)
 
         # ── 左侧：竖向档位条 ──────────────────────────────────────
-        bar_rect = pygame.Rect(0, STATUS_H, BAR_W, MAIN_H)
+        bar_rect = pygame.Rect(0, STATUS_H, BAR_W, layout["main_h"])
         self._draw_notch_bar(surf, bar_rect, names, cur, eb)
 
         # ── 右侧：文字区 ──────────────────────────────────────────
@@ -1563,12 +1810,13 @@ class App:
 
     # ── 轴监视子模式（占据整个主显示区）──────────────────────────────
     def _draw_axis_monitor(self, surf, mouse_pos):
-        rect = pygame.Rect(0, STATUS_H, WIN_W, MAIN_H)
+        layout = self._layout_metrics()
+        rect = pygame.Rect(0, STATUS_H, layout["win_w"], layout["main_h"])
         self.axis_panel.draw(surf, self.fonts, rect, self.js)
 
         hint = "Esc 退出轴监视"
         draw_text(surf, self.fonts["sm"], hint, COLOR_DIM,
-                  WIN_W - 10, STATUS_H + MAIN_H - 18, anchor="topright")
+                  layout["win_w"] - 10, STATUS_H + layout["main_h"] - 18, anchor="topright")
 
     # ── 按键映射控件辅助（标签 + [值] + [×]）─────────────────────────
     _LEARN_TARGET_MAP = {
@@ -1585,7 +1833,7 @@ class App:
 
     def _draw_btn_map(self, surf, fn, mouse_pos, x, y, btn_h,
                       label, cfg_key, learn_cid, clear_cid, disabled=False,
-                      label_w=78, value_w=34, clear_w=20):
+                      label_w=78, value_w=34, clear_w=20, panel_top=None, panel_bottom=None):
         lbl_color = COLOR_DIM if disabled else COLOR_GRAY
         draw_text(surf, fn, label, lbl_color, x, y + 5)
 
@@ -1606,8 +1854,9 @@ class App:
         draw_button(surf, fn, "x", clr_r,
                     hover=hov_c, disabled=not has_val)
 
-        self._clickables.append((learn_cid, val_r))
-        if has_val:
+        if panel_bottom is None or (val_r.bottom <= panel_bottom and (panel_top is None or val_r.top >= panel_top)):
+            self._clickables.append((learn_cid, val_r))
+        if has_val and (panel_bottom is None or (clr_r.bottom <= panel_bottom and (panel_top is None or clr_r.top >= panel_top))):
             self._clickables.append((clear_cid, clr_r))
 
         return label_w + value_w + 2 + clear_w
@@ -1615,14 +1864,16 @@ class App:
     def _draw_controls(self, surf, mouse_pos):
         fn = self.fonts["sm"]
         cfg = self.cfg
+        layout = self._layout_metrics()
+        panel_rect = pygame.Rect(0, layout["ctrl_y"], layout["win_w"], layout["ctrl_h"])
+        pygame.draw.rect(surf, COLOR_PANEL, panel_rect)
+        self.settings_content_h = self._settings_content_height()
 
-        pygame.draw.rect(surf, COLOR_PANEL, (0, CTRL_Y, WIN_W, CTRL_H))
-
-        y = CTRL_Y + 8
+        y = panel_rect.y + 8
         btn_w, btn_h = 110, 26
         gap = 8
         total_row_w = btn_w * 3 + gap * 2
-        start_x = (WIN_W - total_row_w) // 2
+        start_x = (layout["win_w"] - total_row_w) // 2
 
         for i, (cid, label) in enumerate([
             ("btn_vehicle", "选择车辆"),
@@ -1636,15 +1887,25 @@ class App:
             self._clickables.append((cid, r))
 
         y += btn_h + 8
-        if not self.settings_open:
+        show_settings_body = self.settings_open or self.controls_panel_h > self._collapsed_controls_height() + 8
+        self.settings_body_rect = self._get_settings_body_rect(panel_rect)
+        self._clamp_settings_scroll()
+        if not show_settings_body:
             return
 
+        body_rect = self.settings_body_rect
+        content_offset = int(self.settings_scroll)
+        old_clip = surf.get_clip()
+        surf.set_clip(body_rect)
+
+        y = body_rect.y - content_offset
         device_name = self.js.get_name() if self.js else "无设备"
-        draw_text(surf, fn, fit_text(fn, f"设备: {device_name}", WIN_W - 150), COLOR_GRAY, 14, y + 5)
-        dev_r = pygame.Rect(WIN_W - 124, y, 110, btn_h)
+        draw_text(surf, fn, fit_text(fn, f"设备: {device_name}", layout["win_w"] - 150), COLOR_GRAY, 14, y + 5)
+        dev_r = pygame.Rect(layout["win_w"] - 124, y, 110, btn_h)
         hov = dev_r.collidepoint(mouse_pos)
         draw_button(surf, fn, "选择设备", dev_r, hover=hov)
-        self._clickables.append(("btn_device", dev_r))
+        if dev_r.bottom <= body_rect.bottom and dev_r.top >= body_rect.top:
+            self._clickables.append(("btn_device", dev_r))
 
         y += btn_h + 8
 
@@ -1655,14 +1916,16 @@ class App:
         chk_r = pygame.Rect(x, y, 75, btn_h)
         hov = chk_r.collidepoint(mouse_pos)
         draw_checkbox(surf, fn, "反转", chk_r, cfg["axis_invert"], hover=hov)
-        self._clickables.append(("chk_invert", chk_r))
+        if chk_r.bottom <= body_rect.bottom and chk_r.top >= body_rect.top:
+            self._clickables.append(("chk_invert", chk_r))
         x += 85
 
         am_r = pygame.Rect(x, y, 110, btn_h)
         hov = am_r.collidepoint(mouse_pos)
         act = self.axis_monitor_active
         draw_button(surf, fn, "轴监视模式", am_r, hover=hov, active=act)
-        self._clickables.append(("btn_axis_monitor", am_r))
+        if am_r.bottom <= body_rect.bottom and am_r.top >= body_rect.top:
+            self._clickables.append(("btn_axis_monitor", am_r))
 
         y += btn_h + 8
 
@@ -1670,7 +1933,8 @@ class App:
         avg_r = pygame.Rect(x, y, 105, btn_h)
         hov = avg_r.collidepoint(mouse_pos)
         draw_checkbox(surf, fn, "双轴平均", avg_r, cfg.get("axis_dual_average", False), hover=hov)
-        self._clickables.append(("chk_dualavg", avg_r))
+        if avg_r.bottom <= body_rect.bottom and avg_r.top >= body_rect.top:
+            self._clickables.append(("chk_dualavg", avg_r))
         x += 120
         draw_text(surf, fn, f"副轴: {cfg.get('axis2_index', 1)}", COLOR_GRAY, x, y + 5)
 
@@ -1689,7 +1953,8 @@ class App:
         ]
         for row in rows:
             for cx, item in zip(col_x, row):
-                self._draw_btn_map(surf, fn, mouse_pos, cx, y, btn_h, *item, label_w=82)
+                self._draw_btn_map(surf, fn, mouse_pos, cx, y, btn_h, *item, label_w=82,
+                                   panel_top=body_rect.top, panel_bottom=body_rect.bottom)
             y += btn_h + row_gap
 
         x = 14
@@ -1699,30 +1964,34 @@ class App:
         hov = int_r.collidepoint(mouse_pos)
         act = self.interval_editing
         draw_button(surf, fn, f"{cfg['key_interval_ms']}ms", int_r, hover=hov, active=act)
-        self._clickables.append(("btn_interval", int_r))
+        if int_r.bottom <= body_rect.bottom and int_r.top >= body_rect.top:
+            self._clickables.append(("btn_interval", int_r))
         x += 66
 
         chk_eb_r = pygame.Rect(x, y, 98, btn_h)
         hov = chk_eb_r.collidepoint(mouse_pos)
         draw_checkbox(surf, fn, "轴末端EB", chk_eb_r, cfg["axis_eb_enabled"], hover=hov)
-        self._clickables.append(("chk_axiseb", chk_eb_r))
+        if chk_eb_r.bottom <= body_rect.bottom and chk_eb_r.top >= body_rect.top:
+            self._clickables.append(("chk_axiseb", chk_eb_r))
         x += 106
 
         cal_r = pygame.Rect(x, y, 60, btn_h)
         hov_cal = cal_r.collidepoint(mouse_pos)
         act_cal = self.calibration_active
         draw_button(surf, fn, "标定", cal_r, hover=hov_cal, active=act_cal)
-        self._clickables.append(("btn_calibration", cal_r))
+        if cal_r.bottom <= body_rect.bottom and cal_r.top >= body_rect.top:
+            self._clickables.append(("btn_calibration", cal_r))
 
         y += btn_h + 4
-        pygame.draw.line(surf, COLOR_BORDER, (14, y), (WIN_W - 14, y))
+        pygame.draw.line(surf, COLOR_BORDER, (14, y), (layout["win_w"] - 14, y))
         y += 6
 
         plugin_on = cfg.get("plugin_enabled", False)
         plugin_r = pygame.Rect(14, y, 108, btn_h)
         hov_plugin = plugin_r.collidepoint(mouse_pos)
         draw_checkbox(surf, fn, "插件按键", plugin_r, plugin_on, hover=hov_plugin)
-        self._clickables.append(("chk_plugin", plugin_r))
+        if plugin_r.bottom <= body_rect.bottom and plugin_r.top >= body_rect.top:
+            self._clickables.append(("chk_plugin", plugin_r))
 
         y += btn_h + 6
         plugin_rows = [
@@ -1733,10 +2002,23 @@ class App:
         for row in plugin_rows:
             for i, item in enumerate(row):
                 self._draw_btn_map(surf, fn, mouse_pos, col_x[i], y, btn_h, *item,
-                                   disabled=not plugin_on, label_w=82)
+                                   disabled=not plugin_on, label_w=82,
+                                   panel_top=body_rect.top, panel_bottom=body_rect.bottom)
             y += btn_h + row_gap
 
+        surf.set_clip(old_clip)
+
+        if self.settings_content_h > body_rect.height and body_rect.height > 0:
+            track = pygame.Rect(body_rect.right - 8, body_rect.y + 4, 4, max(12, body_rect.height - 8))
+            pygame.draw.rect(surf, (58, 58, 66), track, border_radius=2)
+            thumb_h = max(24, int(track.height * (body_rect.height / self.settings_content_h)))
+            max_scroll = max(1.0, self.settings_content_h - body_rect.height)
+            thumb_y = track.y + int((track.height - thumb_h) * (self.settings_scroll / max_scroll))
+            thumb = pygame.Rect(track.x, thumb_y, track.width, thumb_h)
+            pygame.draw.rect(surf, COLOR_BORDER, thumb, border_radius=2)
+
     def _draw_learn_hint(self, surf):
+        layout = self._layout_metrics()
         target_names = {
             "neutral": "N档按钮",
             "eb": "EB按钮",
@@ -1752,17 +2034,18 @@ class App:
         msg = f"请按手柄按钮来绑定「{name}」  Esc 取消"
         s = self.fonts["sm"]
         tw = s.size(msg)[0]
-        bx = (WIN_W - tw - 20) // 2
-        by = CTRL_Y - 30
+        bx = (layout["win_w"] - tw - 20) // 2
+        by = layout["ctrl_y"] - 30
         pygame.draw.rect(surf, (50, 50, 20), (bx - 4, by - 4, tw + 28, 26), border_radius=5)
         draw_text(surf, s, msg, COLOR_YELLOW, bx + 4, by + 2)
 
     def _draw_interval_hint(self, surf):
+        layout = self._layout_metrics()
         msg = "← → 调整发送间隔  |  Esc 完成"
         s   = self.fonts["sm"]
         tw  = s.size(msg)[0]
-        bx  = (WIN_W - tw - 20) // 2
-        by  = CTRL_Y - 30
+        bx  = (layout["win_w"] - tw - 20) // 2
+        by  = layout["ctrl_y"] - 30
         pygame.draw.rect(surf, (20, 40, 55), (bx - 4, by - 4, tw + 28, 26), border_radius=5)
         draw_text(surf, s, msg, COLOR_YELLOW, bx + 4, by + 2)
 

@@ -5,6 +5,18 @@
     "brake_notches": 8,
     "has_hb": false
   },
+  "209-500系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "205-3100系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
   "E235-0系": {
     "control_type": "1-handle",
     "power_notches": 5,
@@ -12,6 +24,12 @@
     "has_hb": false
   },
   "E217系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "209-2100系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
@@ -29,7 +47,37 @@
     "brake_notches": 8,
     "has_hb": false
   },
+  "KiHa E200系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
   "E233-3000系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E233-5000系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E231系（近郊型）": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "E721系": {
+    "control_type": "1-handle",
+    "power_notches": 5,
+    "brake_notches": 8,
+    "has_hb": false
+  },
+  "EV-E801系": {
     "control_type": "1-handle",
     "power_notches": 5,
     "brake_notches": 8,
